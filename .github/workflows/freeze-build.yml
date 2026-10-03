@@ -63,4 +63,16 @@ jobs:
           find . -type f ! -name MANIFEST.sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > MANIFEST.sha256
           sha256sum -c --quiet MANIFEST.sha256 && echo "MANIFEST OK: $(wc -l < MANIFEST.sha256) files"
 
-      - name:
+      - name: Final zip
+        working-directory: pkg
+        run: |
+          zip -qr EA-O5-EXP-v0.1-FROZEN.zip EA-O5-EXP-v0.1
+          sha256sum EA-O5-EXP-v0.1-FROZEN.zip | tee EA-O5-EXP-v0.1-FROZEN.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EA-O5-EXP-v0.1-FROZEN
+          path: |
+            pkg/EA-O5-EXP-v0.1-FROZEN.zip
+            pkg/EA-O5-EXP-v0.1-FROZEN.zip.sha256
+          if-no-files-found: error
