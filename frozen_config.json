@@ -1,0 +1,28 @@
+{
+  "stack": {
+    "stack_id": "EA-O5-primary-selfhosted-v1",
+    "idp_name": "Keycloak",
+    "idp_version": "26.7.5",
+    "gateway_name": "Envoy Proxy",
+    "gateway_version": "1.38.5",
+    "queue_name": "RabbitMQ",
+    "queue_version": "4.3.6"
+  },
+  "token_lifetime_default_s": 300,
+  "token_lifetime_source": "Keycloak 26.7.5 source, tag 26.7.5, server-spi-private/src/main/java/org/keycloak/models/Constants.java (DEFAULT_ACCESS_TOKEN_LIFESPAN)",
+  "token_lifetime_override": false,
+  "poll_interval_ms": 100,
+  "window_rule": {
+    "type": "quantile_of_baseline",
+    "q": 0.5
+  },
+  "tau_aggregate": "median",
+  "oracle_rule": "all_oracle_runs_prevent",
+  "n_baseline_per_arm": 30,
+  "n_oracle_per_correction": 20,
+  "n_correction_per_correction": 30,
+  "cond_iii_semantics": "aggregate",
+  "corrections_file_sha256": "d62a3b9805a9224cde61f5b65482b0e062c382af5d3078d63e218952671936dc",
+  "sources_file_sha256": "e0612eee22cb11540b7f3f4957cf4c9efeb84f8fdc22a0b84083e588497d6bd4",
+  "conformance_file_sha256": "b596cd5ef19ed691db7dfd43fd0f9840bd67f3a70b0cb3c39258e54468ca91d0"
+}

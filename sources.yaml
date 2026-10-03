@@ -1,0 +1,158 @@
+# EA-O5-EXP-v0.1 provenance of timing inputs (contract section 5).
+# Every input is either measured in the testbed or imposed with a cited source.
+# An imposed input with an empty or TBD source blocks the freeze (analysis.py returns NOT_FROZEN).
+# scope: primary = enters the primary outcome; secondary = managed-platform replication only.
+
+inputs:
+  - parameter: token_portability
+    meaning: Whether a holder other than agent A can use the credential (the manipulated factor)
+    measured_or_imposed: imposed
+    scope: primary
+    source: "RFC 9449, OAuth 2.0 Demonstrating Proof of Possession (DPoP), https://www.rfc-editor.org/rfc/rfc9449"
+    value: "primary arm: bearer token; control arm: DPoP-bound token"
+
+  - parameter: token_lifetime_self_hosted
+    meaning: Shipped default access-token lifetime of the pinned self-hosted IdP version; no override
+    measured_or_imposed: imposed
+    scope: primary
+    # source must be identical to manifest frozen.token_lifetime_source;
+    # value (integer seconds) must equal manifest frozen.token_lifetime_default_s.
+    source: "Keycloak 26.7.5 source, tag 26.7.5, server-spi-private/src/main/java/org/keycloak/models/Constants.java (DEFAULT_ACCESS_TOKEN_LIFESPAN)"
+    value: 300
+    provenance:
+      software_version: "Keycloak 26.7.5 (tag 26.7.5, commit 44299f39868f252ea02236134618c8c5c70a6e9d, released 2026-09-30)"
+      documentation_version: "Source code at tag 26.7.5 (version-pinned; independent of later documentation changes)"
+      access_date: "2026-10-03"
+      exact_statement: >-
+        Constants.java:59 "public static final int DEFAULT_ACCESS_TOKEN_LIFESPAN = 300;"
+        and DefaultExportImportManager.java:251-252 "if (rep.getAccessTokenLifespan() != null)
+        newRealm.setAccessTokenLifespan(rep.getAccessTokenLifespan()); else
+        newRealm.setAccessTokenLifespan(DEFAULT_ACCESS_TOKEN_LIFESPAN);"
+      artifact_sha256: "034b35354af2caeca2d596203f7f826eba5fec524cc54f2b5ec2891c16a3d40b"  # provenance/Constants_26.7.5.java
+      supporting_artifacts: "provenance/PROVENANCE.sha256 (DefaultExportImportManager, ApplianceBootstrap, Profile at tag 26.7.5)"
+    # Conditions under which the shipped default actually applies (part of the frozen stack):
+    realm_rule: >-
+      The test realm is a non-master realm created without accessTokenLifespan in its
+      representation, and no client carries the attribute "access.token.lifespan".
+      The master realm is excluded: ApplianceBootstrap.java:87 sets its lifespan to 60 s
+      ("realm.setAccessTokenLifespan(60);"), which is not the shipped default for new realms.
+      The realm export (JSON) used for the runs is deposited and must show neither override.
+
+  - parameter: dpop_availability
+    meaning: The control arm's DPoP binding is available in the pinned IdP without enabling a preview feature
+    measured_or_imposed: imposed
+    scope: primary
+    source: "Keycloak 26.7.5 source, tag 26.7.5, common/src/main/java/org/keycloak/common/Profile.java:127"
+    value: "DPOP feature Type.DEFAULT (enabled by default); artifact provenance/Profile_26.7.5.java, sha256 4c62485fcd431e213c31b703ed51bfa601496481ec22d0ec41f628f38f9d7f73"
+
+  - parameter: gateway_token_validation
+    meaning: >-
+      How the primary gateway accepts an access token. This fixes c3a's semantics: with local
+      validation, revoking a token at the IdP does not stop an already-issued JWT before expiry.
+    measured_or_imposed: imposed
+    scope: primary
+    source: "Envoy Proxy 1.38.5 (tag v1.38.5, commit 4be7862a2a6d9a7867f576385d545bb0b47b9181, 2026-10-01), api/envoy/extensions/filters/http/jwt_authn/v3/config.proto"
+    value: >-
+      Envoy jwt_authn filter validates Keycloak JWT access tokens locally against the realm JWKS
+      (signature, iss, aud, exp, nbf). No token introspection and no other per-request revocation
+      service is called. c3b is an RBAC DENY policy on the token/client. Shipped clock skew is not
+      overridden: clock_skew_seconds unset, default 60 s (config.proto:349-351; authenticator.cc:224-228),
+      so a JWT is accepted until exp + 60 s. c3a's effect time is measured, not imposed; this entry only
+      states why it cannot precede exp + skew.
+    provenance:
+      artifacts: "provenance/envoy_jwt_authn_config_v1.38.5.proto, provenance/envoy_jwt_authn_authenticator_v1.38.5.cc (hashes in provenance/PROVENANCE.sha256)"
+      access_date: "2026-10-03"
+
+  - parameter: dpop_enforcement
+    meaning: >-
+      Component that verifies the DPoP proof at the gateway. Envoy 1.38.5 has no DPoP support
+      (no HTTP filter mentions DPoP; jwt_authn does not check cnf.jkt), so without it the control
+      arm's DPoP-bound token would be accepted from any holder, like a bearer token.
+    measured_or_imposed: imposed
+    scope: primary
+    source: "Spring Security 7.1.1 (tag 7.1.1, commit a825937b8175ee85872c49d9c7fc25eea8cff991, 2026-08-13) via Spring Boot 4.1.1 (tag v4.1.1, commit c921f13245042fbe718c35474f1621e641a37ff1), DPoP resource-server support"
+    value: >-
+      A DPoP verifier service built on Spring Security 7.1.1, called by Envoy 1.38.5 through the
+      ext_authz HTTP filter, in both arms. Access tokens are validated locally as JWTs against the
+      realm JWKS; no introspection and no revocation lookup.
+    component:
+      library: "Spring Security 7.1.1 (resource server, DPoP)"
+      framework: "Spring Boot 4.1.1 (pins Spring Security 7.1.1: spring-boot-dependencies/build.gradle:2714)"
+      mode: envoy_ext_authz_http
+      token_validation: local_jwt     # JwtDecoder from the realm JWKS; JwtTimestampValidator default skew 60 s
+      introspection: false
+      revocation_lookup: false
+      service_artifacts: >-
+        The verifier's source, build lockfile, built jar, the Envoy configuration and the realm export
+        are hashed in the run manifest's conformance block (conformance.yaml); the hashes must be
+        identical before the first run and after the last run.
+    checks_performed_by_library:   # line numbers refer to the archived files in provenance/
+      proof_signature_and_typ: "DPoPProofJwtDecoderFactory.java:76 (typ dpop+jwt) and 181-198 (RSA or EC signature verified with the jwk in the proof header)"
+      htm: "DPoPProofJwtDecoderFactory.java:154"
+      htu: "DPoPProofJwtDecoderFactory.java:155, compared with request.getRequestURL() (DPoPAuthenticationConverter.java:84)"
+      iat: "DPoPProofJwtDecoderFactory.java:119 and 156, clock skew 30 s"
+      cnf_jkt_binding: "DPoPProofJwtDecoderFactory.java:158 (JwkThumbprintValidator)"
+      ath: "DPoPProofJwtDecoderFactory.java:159 (AthClaimValidator)"
+      jti_replay: "DPoPProofReplayValidator.java:136, in-memory cache, single-use within iat +/- 30 s"
+      downgrade: "BearerTokenAuthenticationFilter.java:181-186 rejects a DPoP-bound token presented as Bearer"
+    arms:
+      primary: "Authorization: Bearer; token has no cnf; accepted by the same filter chain"
+      control: "Authorization: DPoP plus DPoP proof header; token carries cnf.jkt of agent A's key"
+    htu_rule: >-
+      htu is the external request target: scheme + authority + path, without query or fragment
+      (RFC 9449 section 4.3). Envoy's ext_authz http_service has an empty path_prefix and forwards
+      the Authorization, DPoP, Host and X-Forwarded-Proto headers; Envoy sets X-Forwarded-Proto from
+      the downstream connection. The verifier honours forwarded headers, so request.getRequestURL()
+      returns the external URL. Conformance test CT7 checks this.
+    provenance:
+      artifacts: "provenance/spring-security_7.1.1_*.java and provenance/spring-boot_v4.1.1_spring-boot-dependencies.build.gradle (hashes in provenance/PROVENANCE.sha256)"
+      access_date: "2026-10-03"
+
+  - parameter: queue_software
+    meaning: Retry worker B's persistent queue; each queued call carries the token it will replay
+    measured_or_imposed: imposed
+    scope: primary
+    source: "RabbitMQ 4.3.6 (tag v4.3.6, commit 7a34a0caf4fa5cf4009cb934ea7a94dbe7e08095)"
+    value: "durable queue, persistent messages; c5 = reversible hold of B's consumer for this integration"
+
+  - parameter: d_E1_to_E7
+    meaning: Evidence acquisition durations, d(e) = first_readable - event, polled at delta_p
+    measured_or_imposed: measured
+    scope: primary
+    source: testbed
+    value: per run
+
+  - parameter: tau_exec_all_corrections
+    meaning: Commit to effect for c1-c5, vendor-default settings, no artificial delay
+    measured_or_imposed: measured
+    scope: primary
+    source: testbed
+    value: per run
+
+  - parameter: entra_access_token_lifetime
+    meaning: Managed-platform token lifetime and revocation effect
+    measured_or_imposed: imposed
+    scope: secondary
+    source: "Microsoft Entra configurable token lifetimes, https://learn.microsoft.com/en-us/entra/identity-platform/configurable-token-lifetimes ; Revoke user access, https://learn.microsoft.com/en-us/entra/identity/users/users-revoke-access"
+    value: "default random 60-90 min (mean 75); policy range 10 min to 1 day; access lost at token expiry"
+
+  - parameter: entra_cae
+    meaning: Near-real-time enforcement for supported critical events only
+    measured_or_imposed: imposed
+    scope: secondary
+    source: "Microsoft Entra continuous access evaluation, https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-continuous-access-evaluation"
+    value: "user-wide refresh-token revocation; latency up to 15 min; needs CAE-capable client and resource; excluded from primary"
+
+  - parameter: gcp_iam_propagation
+    meaning: Policy and group-membership change propagation on Google Cloud IAM
+    measured_or_imposed: imposed
+    scope: secondary
+    source: "Google Cloud IAM access change propagation, https://docs.cloud.google.com/iam/docs/access-change-propagation"
+    value: "policy: typically 2 min, potentially 7 min or longer; group membership: several minutes to hours"
+
+  - parameter: human_certification_time
+    meaning: Assessment and approval time per class K (secondary human-in-the-loop mode only)
+    measured_or_imposed: imposed
+    scope: secondary
+    source: TBD   # documented SLA, SOP or observational study for the specific role; not a generic reaction time
+    value: TBD

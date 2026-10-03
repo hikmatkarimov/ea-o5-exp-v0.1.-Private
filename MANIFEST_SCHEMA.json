@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "EA-O5-EXP-v0.1/MANIFEST_SCHEMA.json",
+  "title": "EA-O5 Experimental Contract v0.1 - run manifest",
+  "description": "Raw manifest. Two parts: 'frozen' (fixed at deposit, identical for every run) and 'runs' (observations only). The manifest never contains a run category; categories are computed by analysis.py and written to analysis_output.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "study_id",
+    "contract_version",
+    "frozen",
+    "runs",
+    "conformance"
+  ],
+  "properties": {
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract_version": {
+      "type": "string",
+      "const": "EA-O5-EXP-v0.1"
+    },
+    "frozen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stack",
+        "token_lifetime_default_s",
+        "token_lifetime_source",
+        "token_lifetime_override",
+        "poll_interval_ms",
+        "window_rule",
+        "tau_aggregate",
+        "oracle_rule",
+        "corrections_file_sha256",
+        "sources_file_sha256",
+        "n_baseline_per_arm",
+        "n_oracle_per_correction",
+        "n_correction_per_correction",
+        "cond_iii_semantics",
+        "conformance_file_sha256"
+      ],
+      "properties": {
+        "stack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stack_id",
+            "idp_name",
+            "idp_version",
+            "gateway_name",
+            "gateway_version",
+            "queue_name",
+            "queue_version"
+          ],
+          "properties": {
+            "stack_id": {
+              "type": "string"
+            },
+            "idp_name": {
+              "type": "string"
+            },
+            "idp_version": {
+              "type": "string"
+            },
+            "gateway_name": {
+              "type": "string"
+            },
+            "gateway_version": {
+              "type": "string"
+            },
+            "queue_name": {
+              "type": "string"
+            },
+            "queue_version": {
+              "type": "string"
+            }
+          }
+        },
+        "token_lifetime_default_s": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Shipped default of the pinned IdP version, in seconds. Must equal sources.yaml token_lifetime_self_hosted.value."
+        },
+        "token_lifetime_source": {
+          "type": "string",
+          "description": "Citation of the pinned version's documentation for the default lifetime."
+        },
+        "token_lifetime_override": {
+          "type": "boolean",
+          "description": "Must be false. true makes every run VOID."
+        },
+        "poll_interval_ms": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "delta_p. Bounds quantization error 0 <= eps_q < delta_p."
+        },
+        "window_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "q"
+          ],
+          "properties": {
+            "type": {
+              "const": "quantile_of_baseline"
+            },
+            "q": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Quantile of baseline (t_x2 - t_jdagger)."
+            }
+          }
+        },
+        "window_value_ms_declared": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Optional. If present and not equal to the W computed by analysis.py, the study is VOID (hand-set window)."
+        },
+        "tau_aggregate": {
+          "type": "string",
+          "enum": [
+            "median"
+          ],
+          "description": "Aggregate of per-run tau_gate and tau_exec within an arm and correction."
+        },
+        "oracle_rule": {
+          "type": "string",
+          "enum": [
+            "all_oracle_runs_prevent"
+          ],
+          "description": "S(c)=1 iff every oracle run of c prevented X2."
+        },
+        "corrections_file_sha256": {
+          "type": "string"
+        },
+        "sources_file_sha256": {
+          "type": "string"
+        },
+        "n_baseline_per_arm": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Exact number of baseline runs per arm. Any other count makes the study VOID."
+        },
+        "n_oracle_per_correction": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Exact number of oracle runs per correction and arm. Any other count makes the study VOID."
+        },
+        "n_correction_per_correction": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Exact number of correction runs per correction and arm. Any other count makes the study VOID."
+        },
+        "cond_iii_semantics": {
+          "type": "string",
+          "enum": [
+            "aggregate"
+          ],
+          "description": "Primary rule: (iii) evaluated on aggregate (median) tau_exec and tau_tot per correction. A run-paired diagnostic is always reported alongside."
+        },
+        "conformance_file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of conformance.yaml at deposit."
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "arm",
+          "kind",
+          "t_jdagger_ms",
+          "token_issue_ms",
+          "token_exp_ms",
+          "x2_observed",
+          "evidence",
+          "log_hashes"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "arm": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "control",
+              "lever"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "baseline",
+              "oracle",
+              "correction"
+            ]
+          },
+          "correction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null for baseline runs; required for oracle and correction runs."
+          },
+          "t_jdagger_ms": {
+            "type": "integer",
+            "description": "Alert delivered to the overseer (start of the window)."
+          },
+          "t_x2_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Time T4 executed; required for baseline runs; null if X2 did not occur."
+          },
+          "token_issue_ms": {
+            "type": "integer"
+          },
+          "token_exp_ms": {
+            "type": "integer",
+            "description": "Read from the issued token's exp claim; tau_token(r) = exp - issue is a measured input."
+          },
+          "global_block_active": {
+            "type": "boolean",
+            "default": false
+          },
+          "gate_pass_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Earliest time LocalGate(c) held. null = never within the run (tau_gate = infinity)."
+          },
+          "execution_start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "effect_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Time the correction took effect. null = never within the run."
+          },
+          "x2_observed": {
+            "type": "boolean"
+          },
+          "oracle_prevents_x2": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Oracle runs only: X2 did not occur when c was applied at t_jdagger with zero certification and propagation delay."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "item",
+                "event_ms",
+                "first_readable_ms"
+              ],
+              "properties": {
+                "item": {
+                  "type": "string",
+                  "pattern": "^E[1-9][0-9]*$"
+                },
+                "event_ms": {
+                  "type": "integer"
+                },
+                "first_readable_ms": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "log_hashes": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pre",
+        "post"
+      ],
+      "description": "Token-path conformance tests of conformance.yaml, run on the deposited stack before the first run (pre) and after the last run (post). Observations only.",
+      "properties": {
+        "pre": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "performed_ms",
+            "artifact_sha256",
+            "results"
+          ],
+          "properties": {
+            "performed_ms": {
+              "type": "integer"
+            },
+            "artifact_sha256": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "results": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "test_id",
+                  "repetition",
+                  "decision"
+                ],
+                "properties": {
+                  "test_id": {
+                    "type": "string",
+                    "pattern": "^CT[0-9]+$"
+                  },
+                  "repetition": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "post": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "performed_ms",
+            "artifact_sha256",
+            "results"
+          ],
+          "properties": {
+            "performed_ms": {
+              "type": "integer"
+            },
+            "artifact_sha256": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "results": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "test_id",
+                  "repetition",
+                  "decision"
+                ],
+                "properties": {
+                  "test_id": {
+                    "type": "string",
+                    "pattern": "^CT[0-9]+$"
+                  },
+                  "repetition": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# EA-O5-EXP-v0.1 pre-run conformance tests for the token path (frozen at deposit).
+# Run on the deposited stack before the first run and again after the last run.
+# Every test must give its expected decision in every repetition, at both times, and the
+# artifact hashes must be identical at both times; otherwise analysis.py voids the study.
+# Decision = the gateway's response to the request: allow (upstream reached) or deny (401/403).
+
+repetitions: 5
+artifacts_hashed:            # SHA-256 recorded in the manifest's conformance block
+  - verifier_source_tree     # as defined in verifier/build_and_lock.sh; must equal verifier/BUILD_RECORD.json
+  - verifier_build_lockfile  # sha256 of verifier/dependencies.lock; must equal BUILD_RECORD.json
+  - verifier_jar             # sha256 of the deployed jar; must equal BUILD_RECORD.json
+  - envoy_config
+  - keycloak_realm_export
+
+tests:
+  - id: CT1
+    arm: control
+    request: "A's DPoP-bound token, Authorization: DPoP, fresh proof signed by A's key, correct htm and htu"
+    expected: allow
+  - id: CT2
+    arm: control
+    request: "A's DPoP-bound token, Authorization: DPoP, no DPoP proof header"
+    expected: deny
+  - id: CT3
+    arm: control
+    request: "A's DPoP-bound token, Authorization: DPoP, fresh proof signed by B's key (cnf.jkt mismatch)"
+    expected: deny
+  - id: CT4
+    arm: control
+    request: >-
+      Replay of the exact proof and token from a CT1 request that was allowed, sent within 5 s of
+      it (inside the 30 s iat window, so only the jti check can reject it)
+    expected: deny
+  - id: CT5
+    arm: control
+    request: "A's DPoP-bound token presented as Authorization: Bearer, no proof (downgrade)"
+    expected: deny
+  - id: CT6
+    arm: primary
+    request: "A's bearer token presented by B as Authorization: Bearer (the token is portable)"
+    expected: allow
+  - id: CT7
+    arm: control
+    request: "A's DPoP-bound token with a proof whose htu is the verifier's internal URL instead of the external one"
+    expected: deny
